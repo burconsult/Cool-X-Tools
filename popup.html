@@ -42,12 +42,35 @@
             font-size: 0.9em;
             margin-top: 10px;
         }
+        #errorMessage {
+            color: red;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        #imageContainer {
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #imageContainer img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body>
-    <button id="speakPost">Speak X Post</button>
+    <button id="speakPost">Speak Post</button>
+    <button id="roastProfile">Roast Profile</button>
+    <button id="generateImageFromPost">Generate Image from Post</button>
+    <button id="generateImageFromProfile">Generate Image from Profile</button>
     <div id="postText"></div>
-    <div id="status"></div>
+    <div id="imageContainer"></div>
+    <div id="errorMessage"></div>
+    <div id="loadingIndicator" style="display: none;">Processing...</div>
     <script src="popup.js"></script>
+    <a href="settings.html" target="_blank">Settings</a>
 </body>
 </html>

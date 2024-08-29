@@ -6,7 +6,7 @@
     "storage"
   ],
   "host_permissions": [
-    "https://x.com/*"
+    "https://x.com/*", "https://api.anthropic.com/*", "https://api.stability.ai/*", "https://api.replicate.com/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -29,6 +29,6 @@
       "matches": ["https://x.com/*", "https://twitter.com/*"],
       "js": ["content.js"]
     }
-  ]
-
+  ],
+  "options_page": "settings.html"
 }
