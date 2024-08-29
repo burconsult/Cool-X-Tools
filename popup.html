@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>X Post Speaker</title>
+    <title>X Cool Tools</title>
     <style>
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
@@ -59,18 +59,23 @@
             border-radius: 5px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+        #audioPlayer {
+            width: 100%;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
+    <h1>X Cool Tools</h1>
     <button id="speakPost">Speak Post</button>
     <button id="roastProfile">Roast Profile</button>
     <button id="generateImageFromPost">Generate Image from Post</button>
     <button id="generateImageFromProfile">Generate Image from Profile</button>
     <div id="postText"></div>
     <div id="imageContainer"></div>
+    <audio id="audioPlayer" controls></audio>
     <div id="errorMessage"></div>
     <div id="loadingIndicator" style="display: none;">Processing...</div>
     <script src="popup.js"></script>
-    <a href="settings.html" target="_blank">Settings</a>
 </body>
 </html>

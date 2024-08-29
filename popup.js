@@ -1,256 +1,210 @@
+// Constants for default values
+const DEFAULT_ROAST_PROMPT = "Roast this X user's profile in a humorous and witty manner. Be creative and funny, but avoid being overly mean or offensive.";
+const DEFAULT_IMAGE_PROMPT = "Generate a creative and visually interesting image prompt based on the following text. The image should be surreal, artistic, and captivating.";
+const DEFAULT_ELEVENLABS_VOICE_ID = "21m00Tcm4TlvDq8ikWAM";
+const DEFAULT_REPLICATE_MODEL = "black-forest-labs/flux-pro";
+
+document.addEventListener('DOMContentLoaded', initializePopup);
+
+function initializePopup() {
     document.getElementById('speakPost').addEventListener('click', speakPost);
     document.getElementById('roastProfile').addEventListener('click', roastProfile);
-    document.getElementById('generateImageFromPost').addEventListener('click', async () => {
-      try {
+    document.getElementById('generateImageFromPost').addEventListener('click', generateImageFromPost);
+    document.getElementById('generateImageFromProfile').addEventListener('click', generateImageFromProfile);
+
+    const settingsLink = document.createElement('a');
+    settingsLink.href = 'settings.html';
+    settingsLink.target = '_blank';
+    settingsLink.textContent = 'Settings';
+    document.body.appendChild(settingsLink);
+}
+
+async function speakPost() {
+    if (!await checkApiKeys()) return;
+    try {
         toggleLoading(true);
         const postText = await extractPostText();
-        await generateImageFromText(postText);
-      } catch (error) {
-        showError('Error generating image from post: ' + error.message);
-      } finally {
-        toggleLoading(false);
-      }
-    });
-    document.getElementById('generateImageFromProfile').addEventListener('click', async () => {
-      try {
-        toggleLoading(true);
-        const profileInfo = await extractProfileInfo();
-        await generateImageFromText(`Username: ${profileInfo.username}\nBio: ${profileInfo.bio}`, true);
-      } catch (error) {
-        showError('Error generating image from profile: ' + error.message);
-      } finally {
-        toggleLoading(false);
-      }
-    });
-
-    // Main functions
-
-    async function speakPost() {
-      if (!await checkApiKeys()) return;
-      try {
-        toggleLoading(true);
-        const postText = await extractPostText();
-        displayText(`Original Post Text:\n${postText}`);
-        
         const summarizedText = await summarizeText(postText);
-        if (summarizedText !== postText) {
-          displayText(`Original Post Text:\n${postText}\n\nSummarized Text:\n${summarizedText}`);
-        }
-        
-        await textToSpeech(summarizedText);
-      } catch (error) {
+        displayText('Post Text', postText, summarizedText);
+        const audioUrl = await textToSpeech(summarizedText);
+        playAudio(audioUrl);
+    } catch (error) {
         showError('Error speaking post: ' + error.message);
-      } finally {
+    } finally {
         toggleLoading(false);
-      }
     }
+}
 
-    async function roastProfile() {
-      if (!await checkApiKeys()) return;
-      try {
+async function roastProfile() {
+    if (!await checkApiKeys()) return;
+    try {
         toggleLoading(true);
         const profileInfo = await extractProfileInfo();
-        displayText(`Profile:\nUsername: ${profileInfo.username}\nBio: ${profileInfo.bio}`);
-        const roast = await processWithAnthropic(
-          `Make a funny roast for this X user's profile. Keep it short and concise, no more than 100 words. Username: ${profileInfo.username}\nBio: ${profileInfo.bio}`
-        );
-        await textToSpeech(roast);
-      } catch (error) {
+        const profileText = `Username: ${profileInfo.username}\nBio: ${profileInfo.bio}`;
+        displayText('Profile', profileText);
+        const roastPrompt = await getSetting('roastPrompt', DEFAULT_ROAST_PROMPT);
+        const roast = await processWithAnthropic(`${roastPrompt}\n\nProfile: ${profileText}`);
+        displayText('Roast', roast);
+        const audioUrl = await textToSpeech(roast);
+        playAudio(audioUrl);
+    } catch (error) {
         showError('Error roasting profile: ' + error.message);
-      } finally {
+    } finally {
         toggleLoading(false);
-      }
     }
+}
 
-    async function generateImageFromText(text, isProfile = false) {
-      if (!await checkApiKeys()) return;
-      try {
+function playAudio(audioUrl) {
+    const audioPlayer = document.getElementById('audioPlayer');
+    audioPlayer.src = audioUrl;
+    audioPlayer.play();
+}
+
+async function generateImageFromPost() {
+    const postText = await extractPostText();
+    await generateImageFromText(postText, false);
+}
+
+async function generateImageFromProfile() {
+    const profileInfo = await extractProfileInfo();
+    const profileText = `Username: ${profileInfo.username}\nBio: ${profileInfo.bio}`;
+    await generateImageFromText(profileText, true);
+}
+
+async function generateImageFromText(text, isProfile) {
+    if (!await checkApiKeys()) return;
+    try {
         toggleLoading(true);
-        displayText(`${isProfile ? "Profile" : "Post"} Text:\n${text}`);
-        
         const summarizedText = await summarizeText(text);
-        if (summarizedText !== text) {
-          displayText(`Original ${isProfile ? "Profile" : "Post"} Text:\n${text}\n\nSummarized Text:\n${summarizedText}`);
-        }
-        
-        const promptRequest = `Generate a creative AI image prompt based on this ${isProfile ? "X user profile" : "X post"}: ${summarizedText}`;
+        displayText(isProfile ? 'Profile' : 'Post Text', text, summarizedText);
+        const imagePrompt = await getSetting('imagePrompt');
+        const promptRequest = `${imagePrompt}\n\n${isProfile ? "Profile" : "Post"}: ${summarizedText}`;
         const prompt = await processWithAnthropic(promptRequest);
-        displayText(`Generated Image Prompt:\n${prompt}`);
+        displayText('Generated Image Prompt', prompt);
         const imageUrl = await generateImage(prompt);
         displayImage(imageUrl);
-      } catch (error) {
+    } catch (error) {
         showError('Error generating image: ' + error.message);
-      } finally {
+    } finally {
         toggleLoading(false);
-      }
     }
+}
 
-    // Helper functions
+async function summarizeText(text) {
+    if (text.length <= 120) return text;
+    const summary = await processWithAnthropic(`Summarize the following text in no more than 120 characters:\n\n${text}`);
+    return summary.slice(0, 120);
+}
 
-    async function extractPostText() {
-      const tab = await getCurrentTab();
-      return new Promise((resolve, reject) => {
-        chrome.tabs.sendMessage(tab.id, {action: "getTweetText"}, (response) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-          } else if (response && response.text) {
-            resolve(response.text);
-          } else {
-            reject(new Error('No post text found'));
-          }
-        });
-      });
-    }
-
-    async function extractProfileInfo() {
-      const tab = await getCurrentTab();
-      return new Promise((resolve, reject) => {
-        chrome.tabs.sendMessage(tab.id, {action: "getProfileInfo"}, (response) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-          } else if (response && response.profileInfo) {
-            resolve(response.profileInfo);
-          } else {
-            reject(new Error('No profile information found'));
-          }
-        });
-      });
-    }
-
-    async function processWithAnthropic(userContent) {
-      return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage(
-          {
-            action: "processWithAnthropic",
-            userContent: userContent
-          },
-          response => {
-            if (response.success) {
-              resolve(response.data);
-            } else {
-              reject(new Error(response.error));
-            }
-          }
-        );
-      });
-    }
-
-    async function textToSpeech(text) {
-      const ELEVENLABS_API_KEY = await getApiKey('elevenLabs');
-      const voiceID = 'hgo4TYwBXDkASwv0twHG';  // Replace with your desired voice ID
-
-      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceID}`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'audio/mpeg',
-          'Content-Type': 'application/json',
-          'xi-api-key': ELEVENLABS_API_KEY
-        },
-        body: JSON.stringify({
-          text: text,
-          model_id: "eleven_multilingual_v2",
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.5
-          }
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate speech');
-      }
-
-      const blob = await response.blob();
-      const audioUrl = URL.createObjectURL(blob);
-      new Audio(audioUrl).play();
-    }
-
-    async function generateImage(prompt) {
-      return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage(
-          {
-            action: "generateImage",
-            prompt: prompt
-          },
-          response => {
-            if (response.success) {
-              resolve(response.data);
-            } else {
-              reject(new Error(response.error));
-            }
-          }
-        );
-      });
-    }
-
-    // Utility functions
-
-    async function getCurrentTab() {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      return tab;
-    }
-
-    async function getApiKey(service) {
-      return new Promise((resolve) => {
-        chrome.storage.local.get([service + 'Key'], (result) => {
-          if (result[service + 'Key']) {
-            const decryptedKey = decryptKey(result[service + 'Key']);
-            resolve(decryptedKey);
-          } else {
-            resolve(null);
-          }
-        });
-      });
-    }
-
-    function decryptKey(encryptedKey) {
-      const secret = "XVoice4Life";
-      return encryptedKey.split('').map((char, index) => 
-          String.fromCharCode(char.charCodeAt(0) ^ secret.charCodeAt(index % secret.length))
-      ).join('');
-    }
-
-    function displayImage(imageUrl) {
-      const imgElement = document.createElement('img');
-      imgElement.src = imageUrl;
-      imgElement.style.maxWidth = '100%';
-      imgElement.style.height = 'auto';
-      document.getElementById('imageContainer').innerHTML = '';
-      document.getElementById('imageContainer').appendChild(imgElement);
-    }
-
-    function displayText(text) {
-      document.getElementById('postText').innerText = text;
-    }
-
-    function showError(message) {
-      console.error(message);
-      document.getElementById('errorMessage').textContent = message;
-    }
-
-    async function checkApiKeys() {
-      const services = ['anthropic', 'elevenLabs', 'replicate'];
-      for (let service of services) {
-        const key = await getApiKey(service);
+async function checkApiKeys() {
+    const services = ['anthropic', 'elevenLabs', 'replicate'];
+    for (let service of services) {
+        const key = await getSetting(service + 'Key');
         if (!key) {
-          showError(`${service} API key not set. Please go to settings to set your API keys.`);
-          document.getElementById('settingsLink').style.display = 'block';
-          return false;
+            showError(`${service} API key not set. Please go to settings to set your API keys.`);
+            return false;
         }
-      }
-      return true;
     }
+    return true;
+}
 
-    // Add this utility function at the top of your file
-    function toggleLoading(show) {
-      document.getElementById('loadingIndicator').style.display = show ? 'block' : 'none';
+function displayText(title, originalText, summarizedText = null) {
+    let displayContent = `${title}:\n${originalText}`;
+    if (summarizedText && summarizedText !== originalText) {
+        displayContent += `\n\nSummarized ${title}:\n${summarizedText}`;
     }
+    document.getElementById('postText').innerText = displayContent;
+}
 
-    async function summarizeText(text) {
-      if (text.length <= 200) return text;
-      
-      const summary = await processWithAnthropic(
-        `Summarize the following text in no more than 200 characters and only output the summary:\n\n${text}`
-      );
-      return summary.slice(0, 120); // Ensure it's not longer than 120 characters
+function displayImage(imageUrl) {
+    const imgElement = document.createElement('img');
+    imgElement.src = imageUrl;
+    imgElement.style.maxWidth = '100%';
+    document.getElementById('imageContainer').innerHTML = '';
+    document.getElementById('imageContainer').appendChild(imgElement);
+}
+
+function showError(message) {
+    console.error(message);
+    document.getElementById('errorMessage').textContent = message;
+}
+
+function toggleLoading(show) {
+    document.getElementById('loadingIndicator').style.display = show ? 'block' : 'none';
+}
+
+async function processWithAnthropic(userContent) {
+    return sendMessageToBackground("processWithAnthropic", { userContent });
+}
+
+async function generateImage(prompt) {
+    return sendMessageToBackground("generateImage", { prompt });
+}
+
+async function textToSpeech(text) {
+    const audioData = await sendMessageToBackground("textToSpeech", { text });
+    const blob = new Blob([new Uint8Array(audioData)], { type: 'audio/mpeg' });
+    return URL.createObjectURL(blob);
+}
+
+async function sendMessageToBackground(action, data = {}) {
+    return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ action, ...data }, response => {
+            if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+            } else if (response && response.success) {
+                resolve(response.data);
+            } else if (response && response.error) {
+                reject(new Error(response.error));
+            } else {
+                reject(new Error('Unknown error occurred'));
+            }
+        });
+    });
+}
+
+async function extractPostText() {
+    return new Promise((resolve, reject) => {
+        chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+            chrome.tabs.sendMessage(tabs[0].id, {action: "extractPostText"}, function(response) {
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                } else if (response && response.success) {
+                    resolve(response.data);
+                } else {
+                    reject(new Error(response ? response.error : 'Unknown error'));
+                }
+            });
+        });
+    });
+}
+
+async function extractProfileInfo() {
+    return new Promise((resolve, reject) => {
+        chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+            chrome.tabs.sendMessage(tabs[0].id, {action: "extractProfileInfo"}, function(response) {
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                } else if (response && response.success) {
+                    resolve(response.data);
+                } else {
+                    reject(new Error(response ? response.error : 'Unknown error'));
+                }
+            });
+        });
+    });
+}
+
+async function getSetting(key, defaultValue = null) {
+    try {
+        return new Promise((resolve) => {
+            chrome.storage.local.get([key], (result) => {
+                console.log(`Getting setting for ${key}:`, result[key]);
+                resolve(result[key] !== undefined ? result[key] : defaultValue);
+            });
+        });
+    } catch (error) {
+        console.error('Error getting setting:', error);
+        return defaultValue;
     }
+}

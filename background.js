@@ -11,17 +11,31 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === "processWithAnthropic") {
-        processWithAnthropic(request.userContent)
-            .then(response => sendResponse({success: true, data: response}))
-            .catch(error => sendResponse({success: false, error: error.message}));
-        return true;  // Indicates we will send a response asynchronously
-    } else if (request.action === "generateImage") {
-        generateImage(request.prompt)
-            .then(response => sendResponse({success: true, data: response}))
-            .catch(error => sendResponse({success: false, error: error.message}));
-        return true;  // Indicates we will send a response asynchronously
+    switch (request.action) {
+        case "processWithAnthropic":
+            processWithAnthropic(request.userContent)
+                .then(response => sendResponse({success: true, data: response}))
+                .catch(error => sendResponse({success: false, error: error.message}));
+            break;
+        case "generateImage":
+            generateImage(request.prompt)
+                .then(response => sendResponse({success: true, data: response}))
+                .catch(error => sendResponse({success: false, error: error.message}));
+            break;
+        case "textToSpeech":
+            textToSpeech(request.text)
+                .then(response => sendResponse({success: true, data: response}))
+                .catch(error => sendResponse({success: false, error: error.message}));
+            break;
+        case "extractPostText":
+        case "extractProfileInfo":
+            // These should be handled by the content script, not the background script
+            sendResponse({success: false, error: "This action should be handled by the content script"});
+            break;
+        default:
+            sendResponse({success: false, error: "Unknown action"});
     }
+    return true;  // Indicates that we will send a response asynchronously
 });
 
 async function processWithAnthropic(userContent) {
@@ -55,16 +69,11 @@ async function processWithAnthropic(userContent) {
 }
 
 async function getApiKey(service) {
-    return new Promise((resolve) => {
-        chrome.storage.local.get([service + 'Key'], (result) => {
-            if (result[service + 'Key']) {
-                const decryptedKey = decryptKey(result[service + 'Key']);
-                resolve(decryptedKey);
-            } else {
-                resolve(null);
-            }
-        });
-    });
+    const encryptedKey = await getSetting(service + 'Key');
+    if (encryptedKey) {
+        return decryptKey(encryptedKey);
+    }
+    return null;
 }
 
 function decryptKey(encryptedKey) {
@@ -76,37 +85,50 @@ function decryptKey(encryptedKey) {
 
 async function generateImage(prompt) {
     const REPLICATE_API_KEY = await getApiKey('replicate');
-    if (!REPLICATE_API_KEY) {
-        throw new Error('Replicate API key not found. Please set up the extension.');
+    const REPLICATE_MODEL = await getSetting('replicateModel');
+    if (!REPLICATE_API_KEY || !REPLICATE_MODEL) {
+        throw new Error('Replicate API key or model not found. Please set up the extension.');
     }
 
-    // Create prediction
-    const response = await fetch('https://api.replicate.com/v1/predictions', {
+    console.log('Generating image with prompt:', prompt);
+    console.log('Using Replicate model:', REPLICATE_MODEL);
+
+    // Start a prediction
+    const response = await fetch(`https://api.replicate.com/v1/models/${REPLICATE_MODEL}/predictions`, {
         method: 'POST',
         headers: {
-            'Authorization': `Bearer ${REPLICATE_API_KEY}`,
+            'Authorization': `Token ${REPLICATE_API_KEY}`,
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            version: "a1c5e6b9f6f7d9f8f9b6a3b7f8f9e6d9",  // Replace with the actual model version
-            input: { prompt: prompt }
+            input: {
+                steps: 25,
+                prompt: prompt,
+                guidance: 3,
+                interval: 2,
+                aspect_ratio: "1:1",
+                output_format: "webp",
+                output_quality: 80,
+                safety_tolerance: 2
+            }
         }),
     });
 
     if (!response.ok) {
-        throw new Error('Failed to start image generation');
+        const errorData = await response.json();
+        throw new Error(`Failed to start image generation: ${errorData.detail || 'Unknown error'}`);
     }
 
     const prediction = await response.json();
     
     // Poll for the result
-    const pollInterval = 2000; // 2 seconds
-    const maxAttempts = 30; // Maximum number of polling attempts (1 minute total)
+    const pollInterval = 1000; // 1 second
+    const maxAttempts = 60; // Maximum number of polling attempts (1 minute total)
     let attempts = 0;
 
     while (attempts < maxAttempts) {
         const pollResponse = await fetch(prediction.urls.get, {
-            headers: { 'Authorization': `Bearer ${REPLICATE_API_KEY}` }
+            headers: { 'Authorization': `Token ${REPLICATE_API_KEY}` }
         });
         
         if (!pollResponse.ok) {
@@ -117,17 +139,67 @@ async function generateImage(prompt) {
 
         switch (result.status) {
             case 'succeeded':
-                return result.output[0]; // Assuming the output is an array with the image URL as the first item
+                return result.output; // This might be an array of URLs or a single URL
             case 'failed':
                 throw new Error('Image generation failed: ' + (result.error || 'Unknown error'));
             case 'canceled':
                 throw new Error('Image generation was canceled');
-            default:
+            case 'processing':
                 // If still processing, wait and then continue the loop
                 await new Promise(resolve => setTimeout(resolve, pollInterval));
                 attempts++;
+                break;
+            default:
+                throw new Error(`Unexpected status: ${result.status}`);
         }
     }
 
     throw new Error('Image generation timed out');
 }
+
+async function textToSpeech(text) {
+    const ELEVENLABS_API_KEY = await getApiKey('elevenLabs');
+    const ELEVENLABS_VOICE_ID = await getSetting('elevenLabsVoiceId', DEFAULT_ELEVENLABS_VOICE_ID);
+    
+    console.log('ElevenLabs API Key:', ELEVENLABS_API_KEY ? 'Found' : 'Not found');
+    console.log('ElevenLabs Voice ID:', ELEVENLABS_VOICE_ID);
+
+    if (!ELEVENLABS_API_KEY) {
+        throw new Error('ElevenLabs API key not found. Please set up the extension.');
+    }
+
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
+        method: 'POST',
+        headers: {
+            'Accept': 'audio/mpeg',
+            'Content-Type': 'application/json',
+            'xi-api-key': ELEVENLABS_API_KEY
+        },
+        body: JSON.stringify({
+            text: text,
+            model_id: "eleven_multilingual_v2",
+            voice_settings: {
+                stability: 0.5,
+                similarity_boost: 0.5
+            }
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to generate speech');
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    return Array.from(new Uint8Array(arrayBuffer));
+}
+
+async function getSetting(key, defaultValue = null) {
+    return new Promise((resolve) => {
+        chrome.storage.sync.get(key, (result) => {
+            console.log(`Getting setting for ${key}:`, result[key] ? 'Found' : 'Not found');
+            resolve(result[key] !== undefined ? result[key] : defaultValue);
+        });
+    });
+}
+
+const DEFAULT_ELEVENLABS_VOICE_ID = '21m00Tcm4TlvDq8ikWAM';

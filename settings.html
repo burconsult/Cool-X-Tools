@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>X Post Processor Settings</title>
+  <title>Extension Settings</title>
   <style>
     body { width: 300px; padding: 10px; }
     input { width: 100%; margin-bottom: 10px; }
@@ -9,11 +9,32 @@
   </style>
 </head>
 <body>
-  <h2>API Settings</h2>
-  <input type="password" id="anthropicKey" placeholder="Anthropic API Key">
-  <input type="password" id="elevenLabsKey" placeholder="ElevenLabs API Key">
-  <input type="password" id="replicateKey" placeholder="Replicate API Key">
-  <button id="saveKeys">Save Keys</button>
+  <h2>API Keys</h2>
+  <label for="anthropicKey">Anthropic API Key:</label>
+  <input type="password" id="anthropicKey"><br><br>
+  
+  <label for="elevenLabsKey">ElevenLabs API Key:</label>
+  <input type="password" id="elevenLabsKey"><br><br>
+  
+  <label for="replicateKey">Replicate API Key:</label>
+  <input type="password" id="replicateKey"><br><br>
+
+  <h2>Other Settings</h2>
+  <label for="replicateModel">Replicate Model:</label>
+  <input type="text" id="replicateModel"><br><br>
+  
+  <label for="elevenLabsVoiceId">ElevenLabs Voice ID:</label>
+  <input type="text" id="elevenLabsVoiceId"><br><br>
+  
+  <label for="roastPrompt">Roast Prompt:</label>
+  <textarea id="roastPrompt" rows="3" cols="50"></textarea><br><br>
+  
+  <label for="imagePrompt">Image Prompt:</label>
+  <textarea id="imagePrompt" rows="3" cols="50"></textarea><br><br>
+
+  <button id="saveSettings">Save Settings</button>
+  <button id="resetToDefault">Reset to Default</button>
+
   <script src="settings.js"></script>
 </body>
 </html>

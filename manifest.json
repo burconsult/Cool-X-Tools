@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "X Post to Speech",
+  "name": "X Cool Tools",
   "version": "1.0",
   "permissions": [
     "storage"
