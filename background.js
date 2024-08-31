@@ -216,3 +216,6 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
         updateAction(tab.id, tab.url);
     });
 });
+
+// Example log message
+console.log('Cool X Tools: Background script loaded');
