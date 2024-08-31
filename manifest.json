@@ -3,7 +3,9 @@
   "name": "X Cool Tools",
   "version": "1.0",
   "permissions": [
-    "storage"
+    "activeTab",
+    "storage",
+    "tabs"
   ],
   "host_permissions": [
     "https://x.com/*", "https://api.anthropic.com/*", "https://api.stability.ai/*", "https://api.replicate.com/*"

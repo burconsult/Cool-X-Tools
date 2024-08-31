@@ -1,5 +1,5 @@
 chrome.action.onClicked.addListener((tab) => {
-    if (tab.url.includes('x.com') || tab.url.includes('twitter.com')) {
+    if (tab.url && (tab.url.includes('x.com') || tab.url.includes('twitter.com'))) {
         chrome.action.openPopup();
     } else {
         console.log('This extension only works on x.com or twitter.com');
@@ -115,46 +115,36 @@ async function generateImage(prompt) {
     });
 
     if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Failed to start image generation: ${errorData.detail || 'Unknown error'}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const prediction = await response.json();
-    
+    let prediction = await response.json();
+    console.log('Initial prediction response:', prediction);
+
     // Poll for the result
-    const pollInterval = 1000; // 1 second
-    const maxAttempts = 60; // Maximum number of polling attempts (1 minute total)
-    let attempts = 0;
-
-    while (attempts < maxAttempts) {
-        const pollResponse = await fetch(prediction.urls.get, {
-            headers: { 'Authorization': `Token ${REPLICATE_API_KEY}` }
+    while (prediction.status !== 'succeeded' && prediction.status !== 'failed') {
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 1 second
+        const pollResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+            headers: {
+                'Authorization': `Token ${REPLICATE_API_KEY}`,
+            },
         });
-        
-        if (!pollResponse.ok) {
-            throw new Error('Failed to check prediction status');
-        }
-
-        const result = await pollResponse.json();
-
-        switch (result.status) {
-            case 'succeeded':
-                return result.output; // This might be an array of URLs or a single URL
-            case 'failed':
-                throw new Error('Image generation failed: ' + (result.error || 'Unknown error'));
-            case 'canceled':
-                throw new Error('Image generation was canceled');
-            case 'processing':
-                // If still processing, wait and then continue the loop
-                await new Promise(resolve => setTimeout(resolve, pollInterval));
-                attempts++;
-                break;
-            default:
-                throw new Error(`Unexpected status: ${result.status}`);
-        }
+        prediction = await pollResponse.json();
+        console.log('Polling prediction status:', prediction.status);
     }
 
-    throw new Error('Image generation timed out');
+    if (prediction.status === 'failed') {
+        console.error('Image generation failed:', prediction.error);
+        throw new Error(`Image generation failed: ${prediction.error}`);
+    }
+
+    if (prediction.output && prediction.output.length > 0) {
+        console.log('Image generated successfully:', prediction.output[0]);
+        return prediction.output[0];
+    } else {
+        console.error('No image URL in the output');
+        throw new Error('No image URL in the output');
+    }
 }
 
 async function textToSpeech(text) {
@@ -203,3 +193,26 @@ async function getSetting(key, defaultValue = null) {
 }
 
 const DEFAULT_ELEVENLABS_VOICE_ID = '21m00Tcm4TlvDq8ikWAM';
+
+// Function to update the extension's action (icon)
+function updateAction(tabId, url) {
+    if (url && (url.includes('x.com') || url.includes('twitter.com'))) {
+        chrome.action.enable(tabId);
+    } else {
+        chrome.action.disable(tabId);
+    }
+}
+
+// Listen for tab updates and update the action accordingly
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete') {
+        updateAction(tabId, tab.url);
+    }
+});
+
+// Listen for tab activation and update the action
+chrome.tabs.onActivated.addListener((activeInfo) => {
+    chrome.tabs.get(activeInfo.tabId, (tab) => {
+        updateAction(tab.id, tab.url);
+    });
+});
