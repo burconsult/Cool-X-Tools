@@ -1,6 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Cool X Tools",
+  "description": "Enhance your experience on X (formerly Twitter) with a suite of fun! and useful? features.",
   "version": "1.0",
   "permissions": [
     "activeTab",
@@ -8,7 +9,7 @@
     "tabs"
   ],
   "host_permissions": [
-    "https://x.com/*", "https://api.anthropic.com/*", "https://api.replicate.com/*"
+    "https://x.com/*", "https://api.anthropic.com/*", "https://api.elevenlabs.io/*", "https://api.replicate.com/*"
   ],
   "action": {
     "default_popup": "popup.html",
