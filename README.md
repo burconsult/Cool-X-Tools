@@ -2,6 +2,8 @@
 
 Cool X Tools is a browser extension that enhances your experience on X (formerly Twitter) with a suite of fun! and useful? features.
 
+![Cool X Tools Screenshot](screenshot.png)
+
 ## Features
 
 - **Roast and Prompt Generation**: Post and profile data is processed to generate roasts and prompts using Claude AI via the Anthropic API.

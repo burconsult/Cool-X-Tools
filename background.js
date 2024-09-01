@@ -123,14 +123,14 @@ async function generateImage(prompt) {
 
     // Poll for the result
     while (prediction.status !== 'succeeded' && prediction.status !== 'failed') {
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 1 second
-        const pollResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
-            headers: {
-                'Authorization': `Token ${REPLICATE_API_KEY}`,
-            },
-        });
-        prediction = await pollResponse.json();
-        console.log('Polling prediction status:', prediction.status);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 1 second
+    const pollResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+        headers: {
+            'Authorization': `Token ${REPLICATE_API_KEY}`,
+        },
+    });
+    prediction = await pollResponse.json();
+    console.log('Polling prediction status:', prediction.status);
     }
 
     if (prediction.status === 'failed') {
@@ -139,8 +139,9 @@ async function generateImage(prompt) {
     }
 
     if (prediction.output && prediction.output.length > 0) {
-        console.log('Image generated successfully:', prediction.output[0]);
-        return prediction.output[0];
+        const imageUrl = prediction.output;
+        console.log('Image generated successfully:', imageUrl);
+        return imageUrl;
     } else {
         console.error('No image URL in the output');
         throw new Error('No image URL in the output');
