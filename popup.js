@@ -1,9 +1,3 @@
-// Constants for default values
-const DEFAULT_ROAST_PROMPT = "Roast this X user's profile in a humorous and witty manner. Be creative and funny, but avoid being overly mean or offensive.";
-const DEFAULT_IMAGE_PROMPT = "Generate a creative and visually interesting image prompt based on the following text. The image should be surreal, artistic, and captivating.";
-const DEFAULT_ELEVENLABS_VOICE_ID = "21m00Tcm4TlvDq8ikWAM";
-const DEFAULT_REPLICATE_MODEL = "black-forest-labs/flux-pro";
-
 document.addEventListener('DOMContentLoaded', initializePopup);
 
 function initializePopup() {
@@ -11,12 +5,6 @@ function initializePopup() {
     document.getElementById('roastProfile').addEventListener('click', roastProfile);
     document.getElementById('generateImageFromPost').addEventListener('click', generateImageFromPost);
     document.getElementById('generateImageFromProfile').addEventListener('click', generateImageFromProfile);
-
-    const settingsLink = document.createElement('a');
-    settingsLink.href = 'settings.html';
-    settingsLink.target = '_blank';
-    settingsLink.textContent = 'Settings';
-    document.body.appendChild(settingsLink);
 }
 
 async function speakPost() {
@@ -40,13 +28,19 @@ async function roastProfile() {
     try {
         toggleLoading(true);
         const profileInfo = await extractProfileInfo();
-        const profileText = `Username: ${profileInfo.username}\nBio: ${profileInfo.bio}`;
-        displayText('Profile', profileText);
-        const roastPrompt = await getSetting('roastPrompt', DEFAULT_ROAST_PROMPT);
+        const profileText = `Name: ${profileInfo.name}\nHandle: @${profileInfo.handle}\nBio: ${profileInfo.bio}`;
+        displayProfileInfo(profileInfo);
+        const roastPrompt = await getSetting('roastPrompt');
+        if (!roastPrompt) {
+            throw new Error('Roast prompt not found. Please set up the extension.');
+        }
         const roast = await processWithAnthropic(`${roastPrompt}\n\nProfile: ${profileText}`);
         displayText('Roast', roast);
         const audioUrl = await textToSpeech(roast);
         playAudio(audioUrl);
+        
+        // Add "Save as Video" button
+        addSaveVideoButton(profileInfo.profileImageUrl, audioUrl);
     } catch (error) {
         showError('Error roasting profile: ' + error.message);
     } finally {
@@ -54,10 +48,55 @@ async function roastProfile() {
     }
 }
 
+function displayProfileInfo(profileInfo) {
+    const profileContainer = document.getElementById('profileContainer');
+    profileContainer.innerHTML = ''; // Clear previous content
+
+    if (profileInfo.profileImageUrl) {
+        const img = document.createElement('img');
+        img.src = profileInfo.profileImageUrl;
+        img.alt = 'Profile Picture';
+        img.style.width = '100px';
+        img.style.height = '100px';
+        img.style.borderRadius = '50%';
+        img.style.marginBottom = '10px';
+        profileContainer.appendChild(img);
+    }
+
+    const nameElement = document.createElement('p');
+    nameElement.textContent = `Name: ${profileInfo.name}`;
+    profileContainer.appendChild(nameElement);
+
+    const handleElement = document.createElement('p');
+    handleElement.textContent = `Handle: @${profileInfo.handle}`;
+    profileContainer.appendChild(handleElement);
+
+    const bioElement = document.createElement('p');
+    bioElement.textContent = `Bio: ${profileInfo.bio}`;
+    profileContainer.appendChild(bioElement);
+
+    profileContainer.style.display = 'block';
+}
+
 function playAudio(audioUrl) {
     const audioPlayer = document.getElementById('audioPlayer');
     audioPlayer.src = audioUrl;
+    audioPlayer.style.display = 'block';
     audioPlayer.play();
+}
+
+function addSaveVideoButton(imageUrl, audioUrl) {
+    const container = document.getElementById('videoContainer') || document.body;
+    const existingButton = document.getElementById('saveVideoButton');
+    if (existingButton) {
+        container.removeChild(existingButton);
+    }
+
+    const saveButton = document.createElement('button');
+    saveButton.id = 'saveVideoButton';
+    saveButton.textContent = 'Save as Video';
+    saveButton.onclick = () => createVideoWithAudio(imageUrl, audioUrl);
+    container.appendChild(saveButton);
 }
 
 async function generateImageFromPost() {
@@ -67,7 +106,7 @@ async function generateImageFromPost() {
 
 async function generateImageFromProfile() {
     const profileInfo = await extractProfileInfo();
-    const profileText = `Username: ${profileInfo.username}\nBio: ${profileInfo.bio}`;
+    const profileText = `Name: ${profileInfo.name}\nHandle: @${profileInfo.handle}\nBio: ${profileInfo.bio}`;
     await generateImageFromText(profileText, true);
 }
 
@@ -78,6 +117,9 @@ async function generateImageFromText(text, isProfile) {
         const summarizedText = await summarizeText(text);
         displayText(isProfile ? 'Profile' : 'Post Text', text, summarizedText);
         const imagePrompt = await getSetting('imagePrompt');
+        if (!imagePrompt) {
+            throw new Error('Image prompt not found. Please set up the extension.');
+        }
         const promptRequest = `${imagePrompt}\n\n${isProfile ? "Profile" : "Post"}: ${summarizedText}`;
         const prompt = await processWithAnthropic(promptRequest);
         displayText('Generated Image Prompt', prompt);
@@ -166,11 +208,11 @@ async function sendMessageToBackground(action, data = {}) {
 async function extractPostText() {
     return new Promise((resolve, reject) => {
         chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-            chrome.tabs.sendMessage(tabs[0].id, {action: "extractPostText"}, function(response) {
+            chrome.tabs.sendMessage(tabs[0].id, {action: "getTweetText"}, function(response) {
                 if (chrome.runtime.lastError) {
                     reject(new Error(chrome.runtime.lastError.message));
-                } else if (response && response.success) {
-                    resolve(response.data);
+                } else if (response && response.text) {
+                    resolve(response.text);
                 } else {
                     reject(new Error(response ? response.error : 'Unknown error'));
                 }
@@ -182,13 +224,13 @@ async function extractPostText() {
 async function extractProfileInfo() {
     return new Promise((resolve, reject) => {
         chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-            chrome.tabs.sendMessage(tabs[0].id, {action: "extractProfileInfo"}, function(response) {
+            chrome.tabs.sendMessage(tabs[0].id, {action: "getProfileInfo"}, function(response) {
                 if (chrome.runtime.lastError) {
                     reject(new Error(chrome.runtime.lastError.message));
-                } else if (response && response.success) {
-                    resolve(response.data);
+                } else if (response) {
+                    resolve(response);
                 } else {
-                    reject(new Error(response ? response.error : 'Unknown error'));
+                    reject(new Error('Failed to extract profile info'));
                 }
             });
         });
@@ -206,5 +248,58 @@ async function getSetting(key, defaultValue = null) {
     } catch (error) {
         console.error('Error getting setting:', error);
         return defaultValue;
+    }
+}
+
+async function createVideoWithAudio(imageUrl, audioUrl) {
+    try {
+        toggleLoading(true);
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 400;
+        canvas.height = 400;
+
+        // Load and draw image
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = imageUrl;
+        });
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        const audioPlayer = document.getElementById('audioPlayer');
+        
+        const stream = canvas.captureStream();
+        const audioStream = audioPlayer.captureStream();
+        const combinedStream = new MediaStream([...stream.getTracks(), ...audioStream.getTracks()]);
+        const mediaRecorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm' });
+
+        const chunks = [];
+        mediaRecorder.ondataavailable = e => chunks.push(e.data);
+
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(chunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'roast_video.webm';
+            a.textContent = 'Download Roast Video';
+            document.body.appendChild(a);
+            
+            URL.revokeObjectURL(url);
+            toggleLoading(false);
+        };
+
+        mediaRecorder.start();
+        audioPlayer.currentTime = 0;
+        audioPlayer.play();
+
+        audioPlayer.onended = () => mediaRecorder.stop();
+    } catch (error) {
+        showError('Error creating video: ' + error.message);
+        toggleLoading(false);
     }
 }

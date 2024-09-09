@@ -123,14 +123,14 @@ async function generateImage(prompt) {
 
     // Poll for the result
     while (prediction.status !== 'succeeded' && prediction.status !== 'failed') {
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 1 second
-    const pollResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
-        headers: {
-            'Authorization': `Token ${REPLICATE_API_KEY}`,
-        },
-    });
-    prediction = await pollResponse.json();
-    console.log('Polling prediction status:', prediction.status);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 1 second
+        const pollResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+            headers: {
+                'Authorization': `Token ${REPLICATE_API_KEY}`,
+            },
+        });
+        prediction = await pollResponse.json();
+        console.log('Polling prediction status:', prediction.status);
     }
 
     if (prediction.status === 'failed') {
@@ -150,13 +150,13 @@ async function generateImage(prompt) {
 
 async function textToSpeech(text) {
     const ELEVENLABS_API_KEY = await getApiKey('elevenLabs');
-    const ELEVENLABS_VOICE_ID = await getSetting('elevenLabsVoiceId', DEFAULT_ELEVENLABS_VOICE_ID);
+    const ELEVENLABS_VOICE_ID = await getSetting('elevenLabsVoiceId');
     
     console.log('ElevenLabs API Key:', ELEVENLABS_API_KEY ? 'Found' : 'Not found');
     console.log('ElevenLabs Voice ID:', ELEVENLABS_VOICE_ID);
 
-    if (!ELEVENLABS_API_KEY) {
-        throw new Error('ElevenLabs API key not found. Please set up the extension.');
+    if (!ELEVENLABS_API_KEY || !ELEVENLABS_VOICE_ID) {
+        throw new Error('ElevenLabs API key or voice ID not found. Please set up the extension.');
     }
 
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
@@ -192,8 +192,6 @@ async function getSetting(key, defaultValue = null) {
         });
     });
 }
-
-const DEFAULT_ELEVENLABS_VOICE_ID = '21m00Tcm4TlvDq8ikWAM';
 
 // Function to update the extension's action (icon)
 function updateAction(tabId, url) {

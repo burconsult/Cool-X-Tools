@@ -6,7 +6,8 @@
   "permissions": [
     "activeTab",
     "storage",
-    "tabs"
+    "tabs",
+    "downloads"
   ],
   "host_permissions": [
     "https://x.com/*", "https://api.anthropic.com/*", "https://api.elevenlabs.io/*", "https://api.replicate.com/*"

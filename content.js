@@ -1,67 +1,71 @@
+function getProfileInfo() {
+    const nameElement = document.querySelector('[data-testid="UserName"]');
+    const bioElement = document.querySelector('[data-testid="UserDescription"]');
+    
+    let name = null;
+    let handle = null;
+    let bio = null;
+    let profileImageUrl = null;
+
+    if (nameElement) {
+        const userInfo = extractUserInfo(nameElement);
+        name = userInfo.name;
+        handle = userInfo.handle;
+        profileImageUrl = userInfo.imageUrl;
+    }
+
+    if (bioElement) {
+        bio = bioElement.innerText;
+    }
+    
+    const result = { name, handle, bio, profileImageUrl };
+    console.log('Profile Info:', result);
+    return result;
+}
+
+function extractUserInfo(element) {
+    // Get the HTML content of the element
+    const htmlContent = element.innerHTML;
+
+    // Extract the name (assumes it's the first text not starting with @)
+    const nameMatch = htmlContent.match(/<span[^>]*>([^@<]+)<\/span>/);
+    const name = nameMatch ? nameMatch[1].trim() : '';
+
+    // Extract the handle (assumes it starts with @ and ends with </span>)
+    const handleMatch = htmlContent.match(/@(\w+)<\/span>/);
+    const handle = handleMatch ? handleMatch[1] : '';
+
+    // Extract image URL
+    const imageUrl = extractImageUrl(handle);
+
+    return { name, handle, imageUrl };
+}
+
+function extractImageUrl(handle) {
+    const avatarContainer = document.querySelector(`[data-testid="UserAvatar-Container-${handle}"]`);
+    if (avatarContainer) {
+        const imgElement = avatarContainer.querySelector('img[src*="twimg.com"]');
+        return imgElement ? imgElement.src : null;
+    }
+    return null;
+}
+
 function getTweetText() {
     const tweetElement = document.querySelector('[data-testid="tweetText"]');
     return tweetElement ? tweetElement.innerText : null;
 }
 
-function getProfileInfo() {
-    const nameElement = document.querySelector('[data-testid="UserName"]');
-    const bioElement = document.querySelector('[data-testid="UserDescription"]');
-    const username = nameElement ? nameElement.innerText.split('\n')[0] : null;
-    const bio = bioElement ? bioElement.innerText : null;
-    const result = { username, bio };
-    console.log('Profile Info:', result);  // Add this line
-    return result;
-}
-
+// Listener for messages from the background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     switch (request.action) {
-        case "extractPostText":
-            try {
-                const postText = extractPostText();
-                sendResponse({success: true, data: postText});
-            } catch (error) {
-                sendResponse({success: false, error: error.message});
-            }
+        case "getProfileInfo":
+            sendResponse(getProfileInfo());
             break;
-        case "extractProfileInfo":
-            try {
-                const profileInfo = extractProfileInfo();
-                sendResponse({success: true, data: profileInfo});
-            } catch (error) {
-                sendResponse({success: false, error: error.message});
-            }
+        case "getTweetText":
+            sendResponse({ text: getTweetText() });
             break;
         default:
-            sendResponse({success: false, error: "Unknown action"});
+            sendResponse({ error: "Unknown action" });
     }
-    return true;  // Indicates that we will send a response asynchronously
-});
-
-function extractPostText() {
-    const postElement = document.querySelector('[data-testid="tweetText"]');
-    if (!postElement) throw new Error("Couldn't find post text");
-    return postElement.innerText;
-}
-
-function extractProfileInfo() {
-    const nameElement = document.querySelector('[data-testid="UserName"]');
-    const bioElement = document.querySelector('[data-testid="UserDescription"]');
-    if (!nameElement || !bioElement) throw new Error("Couldn't find profile information");
-    const username = nameElement.innerText.split('\n')[0];
-    const bio = bioElement.innerText;
-    return { username, bio };
-}
-
-// Add error handling for message sending
-chrome.runtime.sendMessage({action: "getSelectedText"}, function(response) {
-    if (chrome.runtime.lastError) {
-        console.error('Error sending message:', chrome.runtime.lastError);
-        return;
-    }
-    console.log('Message response:', response);
-    if (response.success) {
-        console.log('Selected text:', response.data);
-    } else {
-        console.error('Error getting selected text:', response.error);
-    }
+    return true; // Keeps the message channel open for asynchronous responses
 });

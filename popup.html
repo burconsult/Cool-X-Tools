@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cool X Tools</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <style>
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
@@ -9,24 +12,43 @@
             padding: 15px; 
             background-color: #f5f8fa;
         }
+        h1 {
+            color: #1DA1F2;
+            text-align: center;
+        }
         button {
             background-color: #1DA1F2;
             color: white;
             border: none;
             padding: 10px 20px;
-            text-align: center;
+            text-align: left;
             text-decoration: none;
-            display: inline-block;
+            display: block;
             font-size: 16px;
-            margin: 4px 2px;
+            margin: 10px auto;
             cursor: pointer;
             border-radius: 20px;
             transition: background-color 0.3s;
+            width: 100%;
         }
         button:hover {
             background-color: #1991DA;
         }
-        #postText {
+        button i {
+            margin-right: 10px;
+            width: 20px;
+            text-align: center;
+        }
+        #profileContainer {
+            display: none;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        #profileContainer img {
+            border-radius: 50%;
+            margin-bottom: 10px;
+        }
+        #postText, #imageContainer {
             margin-top: 15px;
             background-color: white;
             padding: 10px;
@@ -37,9 +59,12 @@
             max-height: 200px;
             overflow-y: auto;
         }
-        #status {
-            color: #657786;
-            font-size: 0.9em;
+        #imageContainer img {
+            max-width: 100%;
+            height: auto;
+        }
+        #audioPlayer {
+            width: 100%;
             margin-top: 10px;
         }
         #errorMessage {
@@ -47,30 +72,36 @@
             font-size: 0.9em;
             margin-top: 10px;
         }
-        #imageContainer {
-            margin-top: 15px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        #imageContainer img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        #audioPlayer {
-            width: 100%;
+        #loadingIndicator {
+            text-align: center;
             margin-top: 10px;
+            font-style: italic;
+            color: #657786;
+        }
+        #settingsLink {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            font-size: 24px;
+            color: #1DA1F2;
+            text-decoration: none;
+            z-index: 1000;
+        }
+        #settingsLink:hover {
+            color: #0c85d0;
         }
     </style>
 </head>
 <body>
-    <h1>Cool X Tools</h1>
-    <button id="speakPost">Speak Post</button>
-    <button id="roastProfile">Roast Profile</button>
-    <button id="generateImageFromPost">Generate Image from Post</button>
-    <button id="generateImageFromProfile">Generate Image from Profile</button>
+    <a id="settingsLink" href="settings.html" target="_blank" title="Settings">
+        <i class="fas fa-cog"></i>
+    </a>
+    <h1>Cool 𝕏 Tools</h1>
+    <div id="profileContainer"></div>
+    <button id="speakPost"><i class="fas fa-volume-up"></i>Speak Post</button>
+    <button id="roastProfile"><i class="fas fa-fire"></i>Roast Profile</button>
+    <button id="generateImageFromPost"><i class="fas fa-image"></i>Generate Image from Post</button>
+    <button id="generateImageFromProfile"><i class="fas fa-user-circle"></i>Generate Image from Profile</button>
     <div id="postText"></div>
     <div id="imageContainer"></div>
     <audio id="audioPlayer" controls></audio>
